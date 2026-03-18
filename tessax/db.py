@@ -11,7 +11,6 @@ db_info = {
 }
 
 
-
 # def insert_data(data):
 #     with cur.copy("COPY products (content, embedding) FROM STDIN WITH (FORMAT BINARY)") as copy:
 #         copy.set_types(["text", "vector"])
@@ -20,14 +19,15 @@ db_info = {
 
 #     cur.close()
 #     conn.close()
-    
-    
+
+
 def connect_db():
     conn = psycopg.connect(**db_info)
     register_vector(conn)
     cur = conn.cursor()
-    return conn , cur
+    return conn, cur
+
+
 def close_db(conn, cur):
     conn.close()
     cur.close()
-    
