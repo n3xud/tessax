@@ -1,11 +1,9 @@
-from .html_reader import HTMLReader
-
+from pipeline import RAGPipeline
+from config import Config
 if __name__ == "__main__":
     print("Starting the application...")
-    html_reader = HTMLReader(
-        sources=[
-            "https://www.hochschule-rhein-waal.de/de/fakultaeten/kommunikation-und-umwelt/studienangebot/bachelorstudiengaenge/medieninformatik-bsc"
-        ]
-    )
-    html_reader.run()
-    # run_app()
+    pipeline = RAGPipeline(pages=["https://www.hochschule-rhein-waal.de/de/fakultaeten/kommunikation-und-umwelt/studienangebot/bachelorstudiengaenge/medieninformatik-bsc"],config=Config(index_name="test"))
+    pipeline.run()
+    
+    print("finished")
+    

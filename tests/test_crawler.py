@@ -1,11 +1,6 @@
 import pytest
-from tessax.html_reader import req_html, HTMLReader, format
+from tessax.html_reader import req_html, format
 from bs4 import BeautifulSoup
-
-
-@pytest.fixture
-def html_reader():
-    return HTMLReader
 
 
 def test_ivalid_page():
@@ -31,6 +26,11 @@ def test_html_format():
             <div>
                 <h1>This is a Heading</h1>
                 <p>This is a paragraph.</p>
+                <div>
+                    <div>
+                        another div will be unwrapped
+                    </div>
+                </div>
             </div>
 
             <p>This is a paragraph.</p>
@@ -54,17 +54,21 @@ def test_html_format():
         <!DOCTYPE html>
         <title>Page Title</title>     
         <body>
-                <div>
-                    <h1>This is a Heading</h1>
-                    <p>This is a paragraph.</p>
-                </div>
-                
+            <div>
+                <h1>This is a Heading</h1>
                 <p>This is a paragraph.</p>
-                    <div>
-                        <h1>This is a Heading 2</h1>
-                        <p>This is a paragraph 2.</p>
-                    </div>
-            </body>""".strip(),
+                <div>
+                    another div will be unwrapped
+                </div>
+            </div>
+            
+            <p>This is a paragraph.</p>
+            <div>
+                <h1>This is a Heading 2</h1>
+                <p>This is a paragraph 2.</p>
+            </div>
+        </body>
+        """.strip(),
         "html.parser",
     )
 

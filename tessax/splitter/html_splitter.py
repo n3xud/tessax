@@ -2,13 +2,18 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 
+from tessax.node import Node
 
-class HTMLSplitter(ABC, BaseModel):
+
+class HTMLSplitter(BaseModel,ABC):
+    
+   
+    
     @abstractmethod
-    def split(data: BeautifulSoup):
-        """splits incoming html data
-
-        Args:
-            data (BeautifulSoup): html to split
-        """
+    def merge(node:Node):
         pass
+
+    @abstractmethod
+    def vectorize():
+        pass
+    
