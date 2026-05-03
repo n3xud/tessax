@@ -1,64 +1,79 @@
 import nltk
 from nltk.tokenize import sent_tokenize
-from typing import List
+import typing as t
+from transformers import AutoModel
 
-
+from . import database
+from .embedding import create_embedding
 nltk.download('punkt_tab')
 
-
-
-
-def _get_sentences(text : str)-> List[str]:
+def tokenize(text : str)-> t.List[str]:
 
     sentences = sent_tokenize(text)
  
     return sentences
     
-
-
-# def deduplicate(embedded_content):
-#         # score = 1
-#         # vector_query = VectorizedQuery(vector = embedded_content, k_nearest_neighbors=3, fields="content_vector", exhaustive=True)
-
-#         # results = config.SEARCH_CLIENT.search(
-#         #     vector_queries=[vector_query],
-#         #     top=1
-#         # )
-#         # results=list(results)
-#         if len(results)!=0:
-#             for result in results:
-
-#                 score = float(list({result['@search.score']})[0])
-
-#             if score <0.95:
-#                 return False
-#             else:
-#                 return True
-#         else:
-#             return False
-# def _as_query_llm(messages):
-
+def retrieve_context(text) -> t.List[str]:
     
-#     text = tokenizer.apply_chat_template(
-#     messages,
-#     tokenize=False,
-#     add_generation_prompt=True,
-#     enable_thinking=False, # Switches between thinking and non-thinking modes. Default is True.
+    embedding = create_embedding(text)
+    
+    nodes = database.search(text,embedding)
+    
+    context = [node[1] for node in nodes]
+    
+    
+    #add parents context
+    if True:
+        parent_context = add_parent_context(nodes)
+        context.append(parent_context)
+        
+    #add sibling context   
+    if True:
+        sibling_context = add_sibling_context(nodes)
+        
+        
+        
+    return(context)
 
-#     )
-    
-#     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
-#     # conduct text completion
-#     generated_ids = model.generate(
-#         **model_inputs,
-#         max_new_tokens=32768,
-#         temperature=0.7,    # Recommended for Qwen 3.0
-#         top_p=0.8,
-#         top_k=20,
-#     )
-#     output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+def add_parent_context(nodes):
+    parent_context = []
+    parents = [node[0] for node in nodes]
     
-#     content = tokenizer.decode(output_ids[0:], skip_special_tokens=True).strip("\n")
+    for parent in set(parents):
+        
+        row = database.get_parent(parent)
+        if row[1]:
+            parent_context.append(row[1])
+            
+    return parent_context
     
-#     return content
+    
+def add_sibling_context(nodes):
+    sibling_context = []
+    parents_id = [node[2] for node in nodes]
+    
+    for parent_id in set(parents_id):
+        row = database.get_siblings(parent_id)
+        if row[1]:
+            sibling_context.append(row[1])
+    
+    return sibling_context
+
+
+def logger(func):
+    def inner():
+        func()
+        
+    return inner
+
+
+model = AutoModel.from_pretrained(
+    'jinaai/jina-reranker-v3',
+    dtype="auto",
+    trust_remote_code=True,
+)
+
+def rerank(query,document):
+    results = model.rerank(query,document)
+    return results

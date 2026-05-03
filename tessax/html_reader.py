@@ -4,13 +4,13 @@
 import requests
 from bs4 import BeautifulSoup, NavigableString, Comment, Tag
 from urllib.parse import urljoin
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, HttpUrl
 import re
 import urllib3
 import copy
 from .config import RAGConfig
 from .node import Node
-import tessax.tools as tools
+from . import tools
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -139,7 +139,7 @@ class HTMLReader(BaseModel):
     """
    
 
-    pages: set
+    pages: set[HttpUrl]
     config : RAGConfig
     visited: set = Field(
         default_factory=set,
@@ -155,7 +155,7 @@ class HTMLReader(BaseModel):
 
     def __iter__(self):
         for url in self.pages:
-            yield from self._crawl(url)
+            yield from self._crawl(str(url))
                 
     def _crawl(self, url:str):
         """Recursively crawl a URL and all links found on its page.
@@ -208,7 +208,7 @@ class HTMLReader(BaseModel):
         sentences = None
         #Extract sentences out of string
         if content_str:
-            sentences = tools._get_sentences(content_str)
+            sentences = tools.tokenize(content_str)
     
     
         root_node = Node(content=sentences,tag=[soup.name],title=self.title)

@@ -9,10 +9,10 @@ CREATE TABLE html_nodes(
 	embedding vector(1024) 
 );
 -- helper function for calculating the score
-CREATE OR REPLACE FUNCTION rrf_score(rank int, rrf_k int DEFAULT 50)
+CREATE OR REPLACE FUNCTION rrf_score(rank bigint, rrf_k int DEFAULT 50)
 RETURNS numeric
 LANGUAGE SQL
 IMMUTABLE PARALLEL SAFE
 AS $$
     SELECT COALESCE(1.0 / ($1 + $2), 0.0);
-$$ ;
+$$;s

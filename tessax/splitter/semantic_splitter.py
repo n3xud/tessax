@@ -3,11 +3,13 @@ from bs4 import BeautifulSoup,Tag
 
 from tessax.node import Node
 from typing import List
-
+from tessax.config import RAGConfig
 
 import tessax.embedding as model
 
 class SemanticSplitter(HTMLSplitter):
+    
+    
        
     def merge(self,root_node:Node):
         
@@ -32,10 +34,10 @@ class SemanticSplitter(HTMLSplitter):
             for index ,node in enumerate(nodes):
                 for text in node.content:
                     if prev_text:         
-                        embedding1 = model._create_embedding(prev_text)
-                        embedding2 = model._create_embedding(text)
+                        embedding1 = model.create_embedding(prev_text)
+                        embedding2 = model.create_embedding(text)
                         similarity = model._get_similarities(embedding1,embedding2)
-                        if similarity>0.2:
+                        if similarity> self.config.simil:
                             
                             tmp_merged.append(text)
                             
@@ -63,5 +65,5 @@ class SemanticSplitter(HTMLSplitter):
     def vectorize(self,root_node:Node):
         for node in root_node.get_nodes():
             if node.content:
-                embedding = model._create_embedding(" ".join(node.content))
+                embedding = model.create_embedding(" ".join(node.content))
                 node.vector = embedding
