@@ -1,3 +1,5 @@
+import os
+os.environ["HF_HUB_OFFLINE"] = "1"
 from vllm import LLM, SamplingParams
 from vllm.sampling_params import StructuredOutputsParams
 import pandas as pd

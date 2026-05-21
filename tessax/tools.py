@@ -25,12 +25,12 @@ def retrieve_context(text) -> t.List[str]:
     #add parents context
     if True:
         parent_context = add_parent_context(nodes)
-        context.append(parent_context)
+        context.extend(parent_context)
         
     #add sibling context   
     if True:
         sibling_context = add_sibling_context(nodes)
-        
+        context.extend(sibling_context)
         
         
     return(context)
@@ -54,9 +54,10 @@ def add_sibling_context(nodes):
     parents_id = [node[2] for node in nodes]
     
     for parent_id in set(parents_id):
-        row = database.get_siblings(parent_id)
-        if row[1]:
-            sibling_context.append(row[1])
+        rows = database.get_siblings(parent_id)
+        for row in rows:
+            if row[1]:
+                sibling_context.append(row[1])
     
     return sibling_context
 

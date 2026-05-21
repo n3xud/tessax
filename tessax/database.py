@@ -67,7 +67,7 @@ def search(text,embedding):
                 sum(rrf_score(searches.rank)) AS score          
             FROM (
                 (
-                        SELECT id, content, rank() OVER (ORDER BY %s <=> embedding) AS rank
+                        SELECT id, content,parent_id, rank() OVER (ORDER BY %s <=> embedding) AS rank
                         FROM html_nodes
                         ORDER BY %s <=> embedding
                         LIMIT 10    
@@ -77,6 +77,7 @@ def search(text,embedding):
                         SELECT
                             id,
                             content,
+                            parent_id,
                             rank() OVER (ORDER BY ts_rank_cd(to_tsvector(content), plainto_tsquery(%s)) DESC) AS rank
                         FROM html_nodes
                         WHERE
@@ -85,7 +86,7 @@ def search(text,embedding):
                         LIMIT 40
                         )
             ) searches
-            GROUP BY searches.id, searches.content
+            GROUP BY searches.id ,searches.content, searches.parent_id
             ORDER BY score DESC
             LIMIT 5;
                     
@@ -121,7 +122,7 @@ def get_siblings(id:int):
                     
                     
                     
-                    """,(id))
+                    """,(id,))
         rows = cur.fetchall()
     return rows
 

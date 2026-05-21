@@ -113,21 +113,19 @@ class Faithfulness(Metric):
       
         
     
-    
-class AnswerRelevance(Metric):
-    
-    #How relevant is the given answer to the question
-    def score():
-        
-        pass
-    
 class ContextRelevance(Metric):
     #How relevant is the retireved context to the question
     def score(self,df:DataFrame):
         
         df["contex_relevancy"] = df.apply(_get_context_relevancy_score,axis=1)   
     
+class AnswerRelevance(Metric):
     
+    #How relevant is the given answer to the question
+    def score():
+        
+        pass   
+
 class Evaluate:
     def __init__(self,metrics : t.List[Metric]):
         self.metrics = metrics
