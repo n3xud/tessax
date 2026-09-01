@@ -1,30 +1,29 @@
-from pydantic import BaseModel
-from enum import Enum, auto
-from typing import List
+from pydantic import BaseModel,ConfigDict
+from enum import Enum
 
-class ChunkModes(Enum):
-    """Enum for different chunk modes."""
+class Question(BaseModel):
+    question : str 
+    ground_truth : list[str]
 
-    BASE_CHUNKING = auto()
-    SENTENCE_CHUNKING = auto()
-    SEMANTIC_CHUNKING  = auto()
-    CONTEXTUAL_CHUNKING = auto()
+class Questions(BaseModel):
+    Questions : list[Question]
 
-class Source(BaseModel):
-    
-    url:str
-    recursive:bool = False
+class Verdict(str, Enum):
+    TP = "TP"
+    FP = "FP"
+    FN = "FN"
 
-class Settings(BaseModel):
-    chunk_size: int | None = 1000
-    chunks_overlap: int | None = 100
-    title: bool | None = False
+class ItemAC(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+    reason: str
+    verdict: Verdict
+    
+class StructureAC(BaseModel):
+    items: list[ItemAC]
+    
+class ItemF(BaseModel):
+    reason: str
+    verdict: int
 
-class SourceList(BaseModel):
-    
-    index_name: str
-    index_type: ChunkModes = ChunkModes.BASE_CHUNKING
-    
-    
-    
-    source: List[Source]
+class StructureF(BaseModel):
+    items: list[ItemF]
