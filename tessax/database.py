@@ -4,6 +4,7 @@ from pgvector.psycopg import register_vector
 from contextlib import contextmanager
 
 from .node import Node
+from .config import cfg
 db_info = {
 "dbname": "example_db",
 "user": "postgres",
@@ -36,9 +37,6 @@ def insert_data(root_node:Node,parent_id=None):
                         
                     ))
         node_id = cur.fetchone()[0]
-        print(node_id)
-        print(root_node.content)
-        print("---------------------------------------")
         for children in root_node.children:
             insert_data(children,node_id)
             
@@ -70,7 +68,7 @@ def search(text,embedding):
                         SELECT id, content,parent_id, rank() OVER (ORDER BY %s <=> embedding) AS rank
                         FROM html_nodes
                         ORDER BY %s <=> embedding
-                        LIMIT 10    
+                        LIMIT 20    
                         )    
                         UNION ALL
                         (
@@ -83,14 +81,14 @@ def search(text,embedding):
                         WHERE
                             plainto_tsquery('simple', %s) @@ to_tsvector('simple', content)
                         ORDER BY rank
-                        LIMIT 40
+                        LIMIT 20
                         )
             ) searches
             GROUP BY searches.id ,searches.content, searches.parent_id
             ORDER BY score DESC
-            LIMIT 5;
+            LIMIT %s;
                     
-            """,(embedding,embedding,text,text))
+            """,(embedding,embedding,text,text,cfg.retrieval_count))
         rows = cur.fetchall()
     return rows
 

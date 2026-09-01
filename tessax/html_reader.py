@@ -1,5 +1,6 @@
 """This module contains tools for scraping web pages and formatting html"""
 
+from tessax.embedding import get_token_length,_get_similarities
 
 import requests
 from bs4 import BeautifulSoup, NavigableString, Comment, Tag
@@ -8,14 +9,22 @@ from pydantic import BaseModel, Field, model_validator, HttpUrl
 import re
 import urllib3
 import copy
-from .config import RAGConfig
+from dataclasses import dataclass,field
+from .config import cfg, ChunkModes
 from .node import Node
-from . import tools
+
+
+
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+
+
+
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 }
 
 
@@ -30,6 +39,7 @@ def req_html(url:str, timeout=60) -> BeautifulSoup:
         BeautifulSoup: _description_
     """
     try:
+        print("request made")
         req = requests.get(url, timeout=timeout, verify=False, headers=headers)
         req.raise_for_status()
         return BeautifulSoup(req.text, "html.parser",multi_valued_attributes=None)
@@ -70,22 +80,22 @@ def format(soup: BeautifulSoup) -> BeautifulSoup:
 
     for tag in reversed(soup.find_all(True)):
         
-        #Removes tags with class hidden
-        if re.search(r"hidden",tag.get("class",""),re.IGNORECASE):
-            tag.decompose()
-            
-        #Removes empty tags    
+        #Removes empty tags  
         is_empty = all(
             isinstance(c, NavigableString) and not c.strip() for c in tag.contents
         )
         if is_empty :
             tag.decompose()
             continue
-
+        #Removes tags with class hidden
+        if re.search(r"hidden",tag.get("class",""),re.IGNORECASE):
+            tag.decompose()
+            continue
+        
         #Unwrap a and strong tags
-        if tag.name in ["a","strong"]:
+        if tag.name in ["a","strong","ul"]:
             tag.unwrap()
-
+            continue
         #Unwraps tags with only one child and no direct text
         child_tags = [c for c in tag.contents if isinstance(c, Tag)]
         child_strings = [c for c in tag.contents if isinstance(c, NavigableString)]
@@ -119,6 +129,82 @@ def get_links(url:str, soup: BeautifulSoup) -> set:
 
 
 
+@dataclass
+class Cache():
+    tags: list | None = field(default_factory=list)
+    nodes : list | None = field(default_factory=list)
+cache = Cache()
+def create_nodes_super(soup:BeautifulSoup):
+    
+    def x(tag:Tag):
+        
+        tags = Cache([tag])
+        found_tags = Cache()
+        for ele in reversed(tag.find_all(recursive=False)):
+            if isinstance(ele,Tag):       
+                value = x(ele)
+                found_tags = compare(value,found_tags)
+        tags = compare(tags,found_tags)
+        return tags
+    tags = x(soup)
+
+    root_node = create_node(tags)
+    return root_node
+    
+
+def create_node(tags:Cache):
+    tag_str_list = ["".join(tag.find_all(string=True, recursive=False)).strip() for tag in tags.tags]
+    tag_str_list= "".join(tag_str_list)
+    data = tag_str_list
+    node = Node(content=[data])
+    
+    for child in tags.nodes:
+        child.parent = node
+        node.children.append(child)  
+    
+    return node 
+    
+
+def compare_size(elem:Cache,elem2:Cache):
+    if get_token_length(elem.tags + elem2.tags) < cfg.chunk_size:
+        return True
+    return False
+def compare_simil(elem:Cache,elem2:Cache):  
+    e1 = "".join("".join(t.find_all(string=True, recursive=False)).strip() for t in elem.tags)
+    e2 = "".join("".join(t.find_all(string=True, recursive=False)).strip() for t in elem2.tags)
+    if not e1 or not e2:
+        similarity = 1.0
+
+    else:
+        
+        similarity = _get_similarities(e1,e2)
+    if similarity> cfg.simil:
+        
+        return True
+        
+    else:
+        return False
+    
+CHUNKERS  = {
+    ChunkModes.FIXED_CHUNKING: compare_size ,
+    ChunkModes.SEMANTIC_CHUNKING: compare_simil,
+}
+
+def compare(elem:Cache,elem2:Cache): 
+    
+    compare_fnc = CHUNKERS.get(cfg.chunk_mode)
+    if compare_fnc(elem,elem2):
+           
+            return Cache(elem.tags + elem2.tags, elem.nodes + elem2.nodes)
+    
+    else: 
+        if elem2.tags:
+            node = create_node(elem2)  
+            return Cache(elem.tags,[node] + elem.nodes)
+        else:
+            node = create_node(elem)
+            return Cache([],[node] + elem.nodes)
+     
 class HTMLReader(BaseModel):
     """Crawls a set of source URLs and yields parsed page data as nested node trees.
 
@@ -139,44 +225,24 @@ class HTMLReader(BaseModel):
     """
    
 
-    pages: set[HttpUrl]
-    config : RAGConfig
-    visited: set = Field(
-        default_factory=set,
-        description="stores already visited sites to prevent duplicates",
-    )
+    page: HttpUrl
     title : str = None
     
-    @model_validator(mode="after")
-    def initialize_visited(self) -> "HTMLReader":
-
-        self.visited.update(self.pages)
-        return self
-
-    def __iter__(self):
-        for url in self.pages:
-            yield from self._crawl(str(url))
-                
-    def _crawl(self, url:str):
-        """Recursively crawl a URL and all links found on its page.
     
-        Yields:
-            root_node (Node): Root of the nested tree representing the page's HTML structure.
-            formatted_html (BeautifulSoup): The formatted HTML of the crawled page.
-        """
-        #Add url to set of visited
-        self.visited.add(url)
+
+                
+    def crawl(self,html = None):
+        
+        
         #Request HTML
-        html = req_html(url)
+        if html is None:
+            
+            html = req_html(self.page)
 
         if html is None:
             return
-        #Get every link on webpage
-        links = get_links(url, html)
-        #Get title of webpage
-        #Doing it here so it does not get executed multiple times in recursive create_nodes function
-        #Subject to change
-        if html.title and self.config.title:
+       
+        if html.title and cfg.title:
             self.title = html.title.get_text()
         else:
             self.title = None
@@ -184,13 +250,9 @@ class HTMLReader(BaseModel):
         formatted_html = format(html)
         #Create nested tree
         root_node = self.create_nodes(formatted_html)
-        yield root_node, formatted_html
+        return root_node, formatted_html
 
-        #Crawl the found links with a recursive function call
-        if self.config.recursive:
-            for link in links:
-                if link not in self.visited:
-                    yield from self._crawl(link)
+        
                 
     def create_nodes(self,soup:BeautifulSoup,parent=None)-> Node:
         """Creates a nested tree out of HTML tags.
@@ -203,22 +265,11 @@ class HTMLReader(BaseModel):
             Node: Root node of nested tree.
         """
         
-        content = soup.find_all(string=True, recursive=False)
-        content_str = "".join(content).strip() or None
-        sentences = None
-        #Extract sentences out of string
-        if content_str:
-            sentences = tools.tokenize(content_str)
-    
-    
-        root_node = Node(content=sentences,tag=[soup.name],title=self.title)
-        if parent:
-                root_node.parent=parent
-
-        for child_tag in soup.find_all(recursive=False):
-
-            if isinstance(child_tag,Tag):
-                child_node = self.create_nodes(child_tag,root_node)
-                root_node.add_children(child_node)
-                
+        
+        root_node = create_nodes_super(soup=soup)    
         return root_node
+    
+    
+    
+            
+            

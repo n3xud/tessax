@@ -1,55 +1,63 @@
 import os
-os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "0"
 from sentence_transformers import SentenceTransformer
-import torch
 
-_embedding_model = SentenceTransformer(
+
+
+import torch
+from bs4 import Tag
+_embedding_model_text_matching = SentenceTransformer(
+    "jinaai/jina-embeddings-v5-text-small-text-matching",
+    model_kwargs={"dtype": torch.bfloat16},
+    trust_remote_code=True
+)
+_embedding_model_retrieval = SentenceTransformer(
     "jinaai/jina-embeddings-v5-text-small-retrieval",
     model_kwargs={"dtype": torch.bfloat16},
     trust_remote_code=True
 )
-
-tokenizer = _embedding_model.tokenizer  
+tokenizer = _embedding_model_text_matching.tokenizer
     
 def tokenizer_encode(text):
     
     encoded = tokenizer.encode(text, add_special_tokens=False)
     return encoded
 
-def tokenizer_decode(tokens):
-    
-    decoded = tokenizer.decode(tokens, skip_special_tokens=True)
-    return decoded
-    
-def get_token_length(text):
-    
-    output = tokenizer_encode(text)
 
-    token_count = len(output)
+    
+def get_token_length(data : str | list | Tag ):
+    
+    if isinstance(data,list):
+       
+        tag_str_list = ["".join(tag.find_all(string=True, recursive=False)).strip() for tag in data]
+        tag_str_list= "".join(tag_str_list)
+        data = tag_str_list
+    
+    elif isinstance(data,Tag):
+        
+        strings = data.find_all(string=True, recursive=False)
+        data = " ".join(strings).strip()
+    output = tokenizer_encode(data)
+    token_count = len(output)    
     return token_count
 
 
-def _get_hidden_states(text):
-    transformer =_embedding_model[0]  
-    tokenizer = transformer.tokenizer
-    auto_model = transformer.auto_model
+
+
+
+def create_doc_embedding(query):
     
-    inputs = tokenizer(text, return_tensors='pt', padding=True, truncation=True,return_offsets_mapping=True)
+    document_embeddings = _embedding_model_retrieval.encode(sentences=query, prompt_name="document")
+    return document_embeddings
+
+def create_retrieval_embedding(query):
     
-    offset_mapping = inputs.pop('offset_mapping')
-    inputs = inputs.to('cuda')
-  
-    with torch.no_grad():
-        outputs = auto_model(**inputs, output_hidden_states=True)
-   
-    return outputs.last_hidden_state , offset_mapping
+    document_embeddings = _embedding_model_retrieval.encode(sentences=query, prompt_name="query")
+    return document_embeddings
 
 
-def create_embedding(query):
-    query_embeddings = _embedding_model.encode(query)
-    return query_embeddings
-
-
-def _get_similarities(emb1,emb2):
-    similarities = _embedding_model.similarity(emb1,emb2)
+def _get_similarities(e1,e2):
+    emb1 = _embedding_model_text_matching.encode(e1)
+    emb2 = _embedding_model_text_matching.encode(e2)
+    similarities = _embedding_model_text_matching.similarity(emb1,emb2)
     return similarities

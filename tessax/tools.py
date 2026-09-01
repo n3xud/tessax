@@ -4,7 +4,8 @@ import typing as t
 from transformers import AutoModel
 
 from . import database
-from .embedding import create_embedding
+from .embedding import create_retrieval_embedding
+from .config import cfg
 nltk.download('punkt_tab')
 
 def tokenize(text : str)-> t.List[str]:
@@ -15,7 +16,7 @@ def tokenize(text : str)-> t.List[str]:
     
 def retrieve_context(text) -> t.List[str]:
     
-    embedding = create_embedding(text)
+    embedding = create_retrieval_embedding(text)
     
     nodes = database.search(text,embedding)
     
@@ -23,16 +24,16 @@ def retrieve_context(text) -> t.List[str]:
     
     
     #add parents context
-    if True:
+    if cfg.add_parent_context:
         parent_context = add_parent_context(nodes)
         context.extend(parent_context)
         
     #add sibling context   
-    if True:
-        sibling_context = add_sibling_context(nodes)
+    if cfg.add_sibling_context:
+        sibling_context = add_sibling_context(nodes,text)
         context.extend(sibling_context)
         
-        
+       
     return(context)
 
 
@@ -45,7 +46,7 @@ def add_parent_context(nodes):
         row = database.get_parent(parent)
         if row[1]:
             parent_context.append(row[1])
-            
+    print(parent_context)
     return parent_context
     
     
@@ -59,22 +60,11 @@ def add_sibling_context(nodes):
             if row[1]:
                 sibling_context.append(row[1])
     
+    
+    print(sibling_context)
     return sibling_context
 
 
-def logger(func):
-    def inner():
-        func()
-        
-    return inner
 
 
-model = AutoModel.from_pretrained(
-    'jinaai/jina-reranker-v3',
-    dtype="auto",
-    trust_remote_code=True,
-)
 
-def rerank(query,document):
-    results = model.rerank(query,document)
-    return results
